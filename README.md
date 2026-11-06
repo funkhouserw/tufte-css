@@ -1,93 +1,51 @@
-Tufte CSS
-=========
-Edward Tufte uses a distinctive style in his handouts: simple, with well-set
-typography, extensive sidenotes, and tight integration of graphics and
-charts. `tufte-css` brings that style to HTML documents.
+# Tufte kit
 
-This project is directly inspired by and
-based on [Tufte-LaTeX](https://tufte-latex.github.io/tufte-latex/) and the
-[R Markdown Tufte Handout](http://rmarkdown.rstudio.com/examples/tufte-handout.pdf).
+A rebuild of [Tufte CSS](https://github.com/edwardtufte/tufte-css) for pages that have to work on phones and inside other people's layouts. This branch (`ilse_version`) is a fork of Edward Tufte's repository; the original lives on [`gh-pages`](https://github.com/funkhouserw/tufte-css/tree/gh-pages) and upstream.
 
+It keeps what makes Tufte CSS worth using (ET Book, the 55/45 feel of text and margin, sidenotes beside the line they belong to) and rebuilds the rest. It's what runs [the.corporateshill.com](https://the.corporateshill.com).
 
-Getting Started
--
-The file *index.html* is a self-describing demonstration document that walks through
-the features of Tufte CSS. The live version at
-[https://edwardtufte.github.io/tufte-css/](https://edwardtufte.github.io/tufte-css/)
-is the best overview of the project.
+## What's different from Tufte CSS 1.9
 
-To use Tufte CSS, just copy `tufte.css` and the `et-book` font
-directory to your project and add the following to your HTML doc's
-head block:
+| | Tufte CSS 1.9 | This kit |
+|---|---|---|
+| Narrow screens | Below 760px, notes hide behind ⊕ toggles | The margin stays a margin: the page slides sideways to it, with a quiet marker ("note 1") at the edge |
+| Sizing | The viewport | Container queries, so it fits any column it's placed in, and the proportions hold at in-between widths |
+| Host page CSS | Competes with it | Lives in `@layer tufte`, so host styles win where they should and resets don't break the columns |
+| Notes too big for the margin | Not handled | Drawers, using the Popover API and CSS anchor positioning |
+| Colors | Light, plus a `prefers-color-scheme` dark mode | `light-dark()` tokens you can override on `.tufte` |
+| Authoring | HTML by hand | Plain Markdown through MDX (a rehype plugin builds sections, figures and image sizes), or React components: `Sidenote`, `MarginNote`, `Figure`, `Full`, `Epigraph`, `NewThought`, `Drawer` and more |
+| Tailwind | None | Optional adapter (`src/tufte/tufte-tailwind.css`) with no Preflight |
+| JavaScript | None | None required. One optional 17-line script improves the sideways slide |
+| Tests | One Playwright regression test | About 165 Playwright tests per engine, across Chromium, Firefox and WebKit |
 
-```html
-<link rel="stylesheet" href="tufte.css"/>
+`DESIGN.md` has the markup contract and the reasoning behind each decision.
+
+## Try it
+
+```sh
+npm install
+npm run dev        # http://localhost:5180/kitchen-sink/ and /plain/
+npm run build      # static pages in dist/
+npm test           # the full suite on three engines
 ```
 
-All other files in the repository can be ignored, as they are merely
-used by the demonstration document.
+Node 24 or newer.
 
+## Status
 
-Project Scope and Status
--
-Tufte CSS is specifically a CSS-only solution for styling HTML for the web.
+Work in progress. Known problems, all covered by failing tests on purpose:
 
-That means that JavaScript solutions, although often superior to pure CSS, are out of scope for this project and will not be used. Also out of scope are handling printed versions of web pages and integration with static site generators or other formats. Thankfully, all these useful applications can be well served by separate work that builds on top of Tufte CSS.
+- WebKit: with the view slid open and JavaScript off, focusing a marker by keyboard can leave it off-screen. Two related focus tests fail.
+- Drawers can fail to paint in WebKit at phone widths (360 to 412px).
+- Firefox: the `rule` marker can sit off its edge.
+- Host CSS resets, right-to-left drawers, and a figure placed after an extremely long note all have edge cases.
 
-This project is maintained but not under active development. It is considered essentially feature-complete. Refactoring and new functionality are a very low priority. However, contributions are still welcome to fix bugs or add functionality.
+The sideways margin has only been tested in desktop engines with emulated touch; it needs real phones.
 
+## Fonts
 
-Testing
--
-Tests use [Playwright](https://playwright.dev/) to assert computed CSS properties. `npm install` to set up, `npm test` to run. Fixtures in `tests/` are plain HTML files — open one directly in a browser to inspect a feature in isolation.
+ET Book is included as in upstream, under the MIT License. Its font files carry an OS/2 embedding flag that's stricter than that license; if that matters for your use, check before redistributing.
 
+## License
 
-Deploying
--
-1. Make changes
-2. From shell: `npm run build`
-3. Bump version in *package.json*
-4. From shell: `npm publish`
-
-
-Contributing
--
-If you notice something wrong or broken, let us know by opening an
-issue, or better yet, a pull request with how you think it should be
-fixed.
-
-Please document your issues and fixes thoroughly. This means a clear
-description of the concern, steps on how to reproduce it, and (if
-possible) before and after screenshots and links to prior discussions
-or commits. Please keep pull requests to one change at a time.
-
-Fixes and new functionality should be tested against `index.html` on
-screens as small as an iPhone 4 and as big as, well, as big as you use
-normally. (If you don't have a mobile device handy, fake different
-devices with your browser's developer tools.)
-
-See the Issues page, especially [Help
-Wanted](https://github.com/edwardtufte/tufte-css/labels/help%20wanted),
-for opportunities to contribute.
-
-
-Contributors
--
- - Dave Liepmann (creator, project maintainer, design)
- - Edward Tufte (editing, direction, design)
- - [Adam Schwartz](https://github.com/adamschwartz) (ET Book font)
- - [Clay Harmon](https://github.com/edwardtufte/tufte-css/commits/master?author=clayh53) (media queries, rem units)
- - [Linjie Ding](https://github.com/edwardtufte/tufte-css/commits/master?author=pyrocat101) (italic typeface)
- - [Stephen A Thomas](https://github.com/edwardtufte/tufte-css/commits/master?author=sathomas) (automagically numbered sidenotes)
- - [Ben Newman](https://github.com/edwardtufte/tufte-css/pull/9) (sidenote numbering style)
- - [Kevin Godby](https://github.com/edwardtufte/tufte-css/commits/master?author=godbyk) (booktabs tables)
- - [James Kolce](https://github.com/edwardtufte/tufte-css/commits/master?author=jameskolce) (sidenote fixes)
- - [Chris MacKay](https://github.com/crmackay) (sidenote toggling on small screens)
- - [Paul Rodriguez](https://github.com/edwardtufte/tufte-css/commits/master?author=ruricolist)
-   (sidenote style tweaks)
- - [Claudiu-Vlad Ursache](https://github.com/edwardtufte/tufte-css/commits/master?author=ursachec) (HTML5 conformity)
-
-
-License
--
-Released under the MIT license. See [LICENSE](https://github.com/edwardtufte/tufte-css/blob/gh-pages/LICENSE).
+MIT, as upstream. Tufte CSS is by Dave Liepmann and now an Edward Tufte project; this rebuild is by Ilse Funkhouser, written with Claude.

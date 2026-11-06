@@ -1,0 +1,904 @@
+@charset "UTF-8";
+/* Tufte kit: core CSS. A modern rebuild of Tufte CSS (https://github.com/edwardtufte/tufte-css,
+   MIT). Markup contract and principles: blog/DESIGN.md.
+
+   Layout. Article children stay in normal block flow, in one block formatting context.
+   That is what makes margin notes safe: a note is `float` + `clear`, and clear only sees
+   floats in the same BFC, so notes in adjacent paragraphs stack instead of colliding.
+   Do not make article children grid or flex items, and do not give them overflow.
+
+   Columns are computed once, on the article's direct children, because only descendants
+   of a container can read its cqi. They inherit as absolute lengths, so wrappers at any
+   depth change nothing. Every block ends at the text column's end edge, which keeps
+   the distance from a note's paragraph to the margin column constant.
+
+   Proportions, wide mode, following upstream's: the text is 55% of the room, the gap 10%
+   of the text and the margin column 50% of it. Text stops growing at the measure, and
+   below 22em of body text it stops shrinking, which is what fixes upstream's mid widths.
+   The gap tightens with the container, and the column pair is centred in what's left.
+
+   Modes. Notes float into a margin column at every width, in the same markup. Wide starts
+   at 48em of the article's own font size, and there the margin fits beside the text. Below
+   that it runs past the edge of the screen with a sliver showing: the article is itself a
+   horizontal scroller, so the reader drags text and margin across together, and once the
+   margin fits there is nothing left to scroll. A container condition can't read a custom
+   property, so 48em is written in several places here and twice in tufte-tailwind.css.
+
+   Tuning. Set the inputs on .tufte: --tufte-text-max, --tufte-measure, --tufte-paper and
+   the rest of the first rule. data-marker="word|rule|bleed" on the article picks how a
+   note shows in the sliver. The --tufte-col-* values, --tufte-text-size, --tufte-note-size,
+   and --tufte-baseline are outputs, for reading only. */
+
+@import "./drawer.css";
+
+@font-face {
+  font-family: "et-book";
+  src: url("./fonts/et-book-roman-line-figures.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "et-book";
+  src: url("./fonts/et-book-display-italic-old-style-figures.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "et-book";
+  src: url("./fonts/et-book-semi-bold-old-style-figures.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "et-book";
+  src: url("./fonts/et-book-bold-line-figures.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "et-book-roman-old-style";
+  src: url("./fonts/et-book-roman-old-style-figures.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Registered so each resolves to px where it is declared and inherits as px: em and cqi
+   in these never re-resolve against a heading's font size or a nested container. */
+@property --tufte-u { syntax: "<length>"; inherits: true; initial-value: 16px; }
+@property --tufte-text-size { syntax: "<length>"; inherits: true; initial-value: 21px; }
+@property --tufte-note-size { syntax: "<length>"; inherits: true; initial-value: 16.5px; }
+@property --tufte-baseline { syntax: "<length>"; inherits: true; initial-value: 30px; }
+@property --tufte-pad { syntax: "<length>"; inherits: true; initial-value: 16px; }
+@property --tufte-col-room { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --tufte-col-start { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --tufte-col-text { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --tufte-col-gap { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --tufte-col-margin { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --tufte-col-full { syntax: "<length>"; inherits: true; initial-value: 0px; }
+
+@layer tufte {
+  /* ---- Inputs ------------------------------------------------------------ */
+  :where(.tufte) {
+    /* `medium` is the reader's default font size. It ignores whatever the host page did
+       to the root font size, and still honours the browser's text-size setting. */
+    font-size: medium;
+    --tufte-u: 1em;
+
+    /* 19px to 21px across phones. ET Book is small on its body: 19px reads like 16px
+       Georgia. A phone gets fewer characters a line rather than smaller type. */
+    --tufte-text-min: calc(var(--tufte-u) * 1.1875);
+    --tufte-text-max: calc(var(--tufte-u) * 1.3125);
+    --tufte-text-fluid: calc(var(--tufte-u) * 0.854 + 1.667cqi);
+    --tufte-line-ratio: calc(30 / 21);
+    --tufte-note-ratio: calc(16.5 / 21);
+    --tufte-note-min: calc(var(--tufte-u) * 0.875);
+    --tufte-note-line: 1.3;
+    --tufte-note-nudge: 0.36em;
+
+    /* Wide mode: the text's share of the room, its limits in em of body text, and the
+       gap and margin column as fractions of the text. */
+    --tufte-text-share: 0.55;
+    --tufte-measure: 31.5;
+    --tufte-measure-min: 22;
+    --tufte-gap-ratio: 0.1;
+    --tufte-margin-ratio: 0.5;
+    --tufte-embed-ratio: 16 / 9;
+
+    /* Narrow screens. The sliver is how much of the margin shows at rest, and the hanging
+       column is where a note's marker sits, a hair wider so its text stays out of view.
+       The margin is as wide as fits while leaving some of the text in sight when open. */
+    --tufte-sliver: calc(var(--tufte-u) * 1.875);
+    --tufte-note-hang: calc(var(--tufte-u) * 2);
+    --tufte-slide-gap: calc(var(--tufte-u) * 0.75);
+    --tufte-slide-end: calc(var(--tufte-u) * 0.75);
+    --tufte-slide-margin: calc(var(--tufte-u) * 18);
+    --tufte-slide-keep: calc(var(--tufte-u) * 6.375);
+
+    --tufte-color-scheme: light dark;
+    --tufte-paper: light-dark(#fffff8, #151515);
+    --tufte-ink: light-dark(#111, #ddd);
+    --tufte-rule: light-dark(#ccc, #444);
+    --tufte-muted: light-dark(#555, #aaa);
+    --tufte-focus: currentColor;
+
+    --tufte-font: et-book, Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif;
+    --tufte-font-numeral: et-book-roman-old-style, var(--tufte-font);
+    --tufte-font-sans: "Gill Sans", "Gill Sans MT", Calibri, sans-serif;
+    --tufte-font-table: "Trebuchet MS", "Gill Sans", "Gill Sans MT", sans-serif;
+    --tufte-font-mono: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+
+    color-scheme: var(--tufte-color-scheme);
+    container: tufte / inline-size;
+    display: flow-root; /* holds a long last note inside the article */
+    /* The sideways scroller, at every width: it stops scrolling once the margin fits.
+       Nothing is ever taller than the article, so hidden clips nothing vertically and
+       vertical drags go to the page. */
+    overflow: auto hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    box-sizing: border-box;
+    /* Top space is on ::before, the only place that can read the mode. */
+    padding-block: 0 calc(var(--tufte-u) * 4.5);
+    /* Size containment leaves no content width, so a flex item or float would be 0 wide.
+       This is what it reports instead; an ordinary block parent ignores it. */
+    contain-intrinsic-inline-size: min(80em, 100vw);
+    min-inline-size: 0;
+    font-family: var(--tufte-font);
+    color: var(--tufte-ink);
+    background-color: var(--tufte-paper);
+    overflow-wrap: break-word;
+    font-kerning: normal;
+    hanging-punctuation: first;
+  }
+  :where(.tufte *, .tufte *::before, .tufte *::after) {
+    box-sizing: border-box;
+  }
+  :where(.tufte)::-webkit-scrollbar {
+    display: none;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where(.tufte) {
+      scroll-behavior: smooth;
+    }
+  }
+
+  /* ---- Outputs: the columns, narrow mode -------------------------------- */
+  :where(.tufte > *), :where(.tufte)::after {
+    --tufte-text-size: clamp(var(--tufte-text-min), var(--tufte-text-fluid), var(--tufte-text-max));
+    --tufte-baseline: calc(var(--tufte-text-size) * var(--tufte-line-ratio));
+    --tufte-note-size: max(var(--tufte-note-min), var(--tufte-text-size) * var(--tufte-note-ratio));
+    --tufte-pad: clamp(var(--tufte-u) * 0.875, 3.75cqi, var(--tufte-u) * 2);
+    --tufte-col-room: calc(100cqi - 2 * var(--tufte-pad));
+    --tufte-col-text: min(var(--tufte-col-room), var(--tufte-text-size) * var(--tufte-measure));
+    --tufte-col-gap: 0px;
+    --tufte-col-margin: 0px;
+    --tufte-col-full: var(--tufte-col-text);
+    --tufte-col-start: max(var(--tufte-pad), (100cqi - var(--tufte-col-full)) / 2);
+    font-size: var(--tufte-text-size);
+    line-height: var(--tufte-baseline);
+  }
+  /* An article with something for the margin keeps a sliver of it on screen. One with
+     nothing has no margin, no sliver and nothing to scroll. */
+  :where(.tufte:has(:is(.tufte-note, .tufte-margin-block, .tufte-figure[data-size="margin"]):not(.tufte-drawer *)) > *),
+  :where(.tufte:has(:is(.tufte-note, .tufte-margin-block, .tufte-figure[data-size="margin"]):not(.tufte-drawer *)))::after {
+    --tufte-col-gap: var(--tufte-slide-gap);
+    --tufte-col-text: min(
+      100cqi - var(--tufte-pad) - var(--tufte-col-gap) - var(--tufte-sliver),
+      var(--tufte-text-size) * var(--tufte-measure)
+    );
+    --tufte-col-margin: min(var(--tufte-slide-margin), 100cqi - var(--tufte-slide-keep));
+    --tufte-col-full: calc(var(--tufte-col-text) + var(--tufte-col-gap) + var(--tufte-col-margin));
+    --tufte-col-start: max(var(--tufte-pad), 100cqi - var(--tufte-col-text) - var(--tufte-col-gap) - var(--tufte-sliver));
+  }
+  /* Browser defaults indent these on both sides. Before the next rule, so that as direct
+     children they still take the column. */
+  :where(.tufte blockquote, .tufte figure) {
+    margin-inline: 0;
+  }
+  /* A popover (block drawer) placed directly in the article positions itself. */
+  :where(.tufte > :not([popover])) {
+    inline-size: var(--tufte-col-text);
+    margin-inline: var(--tufte-col-start) 0;
+  }
+
+  /* A size container has style containment, which walls its own counter-reset off from
+     its descendants: on .tufte, every note would read 1. This pseudo-element is inside
+     the wall, and a counter is in scope for the following siblings, so all the article. */
+  :where(.tufte)::before {
+    content: "";
+    display: block;
+    block-size: calc(var(--tufte-u) * 1.5);
+    counter-reset: tufte-sidenote;
+    scroll-snap-align: start;
+  }
+  /* The other resting place, and what holds the scroller open to the margin's outer edge
+     whether or not a note reaches that far. */
+  :where(.tufte:has(:is(.tufte-note, .tufte-margin-block, .tufte-figure[data-size="margin"]):not(.tufte-drawer *)))::after {
+    content: "";
+    display: block;
+    inline-size: 1px;
+    block-size: 0;
+    margin-inline-start: calc(var(--tufte-col-start) + var(--tufte-col-full) + var(--tufte-slide-end) - 1px);
+    scroll-snap-align: end;
+  }
+
+  /* ---- Type ------------------------------------------------------------- */
+  :where(.tufte section) {
+    padding-block: calc(var(--tufte-baseline) / 2);
+  }
+  :where(.tufte h1, .tufte h2, .tufte h3) {
+    font-weight: 400;
+    line-height: 1;
+    text-wrap: balance;
+  }
+  :where(.tufte h1) {
+    margin-block: calc(var(--tufte-baseline) / 2) calc(var(--tufte-baseline) * 0.75);
+    font-size: calc(var(--tufte-text-size) * 3.2 / 1.4);
+  }
+  :where(.tufte h2) {
+    margin-block: calc(var(--tufte-baseline) * 1.05) calc(var(--tufte-baseline) * 0.7);
+    font-size: calc(var(--tufte-text-size) * 2.2 / 1.4);
+    font-style: italic;
+  }
+  :where(.tufte h3) {
+    margin-block: var(--tufte-baseline) calc(var(--tufte-baseline) * 0.7);
+    font-size: calc(var(--tufte-text-size) * 1.7 / 1.4);
+    font-style: italic;
+  }
+  :where(.tufte-subtitle) {
+    margin-block: calc(var(--tufte-baseline) / 2);
+    font-size: calc(var(--tufte-text-size) * 1.8 / 1.4);
+    font-style: italic;
+    line-height: 1;
+    text-wrap: balance;
+  }
+  :where(.tufte p) {
+    margin-block: calc(var(--tufte-baseline) * 0.7);
+    text-wrap: pretty;
+  }
+  :where(.tufte-newthought) {
+    font-variant: small-caps;
+    font-size: 1.2em;
+    line-height: 0;
+  }
+  :where(.tufte-numeral) {
+    font-family: var(--tufte-font-numeral);
+  }
+  :where(.tufte-sans) {
+    font-family: var(--tufte-font-sans);
+    letter-spacing: 0.03em;
+  }
+  :where(.tufte sup) {
+    line-height: 0;
+  }
+  :where(.tufte a) {
+    color: inherit;
+    text-underline-offset: 0.1em;
+    text-decoration-thickness: 0.05em;
+  }
+  :where(.tufte hr) {
+    block-size: 0;
+    margin-block: calc(var(--tufte-baseline) * 0.7);
+    border: 0;
+    border-block-start: 1px solid var(--tufte-rule);
+  }
+
+  /* Lists. Indent at the start edge only: the end edge stays on the column. */
+  :where(.tufte ul, .tufte ol, .tufte dl) {
+    margin-block: calc(var(--tufte-baseline) * 0.7);
+    padding-inline-start: 1.6em;
+  }
+  :where(.tufte ul) {
+    list-style: disc;
+  }
+  :where(.tufte ul ul) {
+    list-style: circle;
+  }
+  :where(.tufte ol) {
+    list-style: decimal;
+  }
+  :where(.tufte li, .tufte dd, .tufte dt) {
+    text-wrap: pretty;
+  }
+  :where(.tufte li:not(:first-child), .tufte dt:not(:first-child)) {
+    margin-block-start: calc(var(--tufte-baseline) / 8);
+  }
+  :where(.tufte li > :is(ul, ol)) {
+    margin-block: calc(var(--tufte-baseline) / 8) 0;
+  }
+  :where(.tufte dl) {
+    padding-inline-start: 0;
+  }
+  :where(.tufte dd) {
+    margin-inline-start: 1.6em;
+  }
+
+  /* Quotes */
+  :where(.tufte blockquote) {
+    margin-block: calc(var(--tufte-baseline) * 0.7);
+    padding-inline-start: min(1.9em, 6cqi);
+  }
+  :where(.tufte blockquote footer) {
+    font-size: var(--tufte-note-size);
+    line-height: 1.5;
+    text-align: end;
+  }
+  :where(.tufte-epigraph) {
+    margin-block: calc(var(--tufte-baseline) * 2.5);
+  }
+  :where(.tufte-epigraph blockquote) {
+    margin-block: calc(var(--tufte-baseline) * 1.5);
+    font-style: italic;
+  }
+  :where(.tufte-epigraph footer) {
+    font-style: normal;
+  }
+  :where(.tufte-epigraph cite) {
+    font-style: italic;
+  }
+
+  /* Code */
+  :where(.tufte code) {
+    font-family: var(--tufte-font-mono);
+    font-size: 0.72em;
+    line-height: 0; /* a smaller inline box would otherwise push its line apart */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  :where(.tufte :is(h1, h2, h3) code) {
+    font-size: 0.8em;
+  }
+  :where(.tufte pre) {
+    margin-block: calc(var(--tufte-baseline) * 0.7);
+    padding-inline-start: 2.5%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain; /* a drag here moves the code, not the margin */
+    font-size: calc(var(--tufte-text-size) * 0.9 / 1.4);
+    line-height: 1.42;
+    tab-size: 2;
+  }
+  :where(.tufte pre > code) {
+    display: block;
+    inline-size: max-content;
+    min-inline-size: 100%;
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  /* Tables: booktabs rules, sized to content, scrolling inside their wrapper. */
+  :where(.tufte-table) {
+    margin-block: calc(var(--tufte-baseline) * 0.7);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    font-family: var(--tufte-font-table);
+    font-size: var(--tufte-note-size);
+    line-height: 1.4;
+  }
+  :where(.tufte-table table) {
+    margin-inline: auto;
+    border-collapse: collapse;
+    border-block: 2px solid var(--tufte-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  :where(.tufte-table caption) {
+    caption-side: bottom;
+    padding-block-start: 0.5em;
+    text-align: start;
+    font-size: 0.9em;
+  }
+  :where(.tufte-table :is(th, td)) {
+    padding: 0.3em 0.5em;
+    text-align: start;
+    vertical-align: baseline;
+  }
+  :where(.tufte-table thead th) {
+    border-block-end: 1px solid var(--tufte-ink);
+    font-weight: 400;
+  }
+  :where(.tufte-table tfoot td, .tufte-table tfoot th) {
+    border-block-start: 1px solid var(--tufte-ink);
+  }
+
+  /* Media */
+  :where(.tufte img, .tufte svg, .tufte video) {
+    max-inline-size: 100%;
+    block-size: auto;
+  }
+  :where(.tufte-figure) {
+    margin-block: 0 calc(var(--tufte-baseline) * 1.5);
+    padding: 0;
+  }
+  :where(.tufte-figure > :is(img, svg, video)) {
+    display: block;
+    inline-size: 100%;
+  }
+  :where(.tufte-figure figcaption) {
+    margin-block-start: 0.5em;
+    font-size: var(--tufte-note-size);
+    line-height: var(--tufte-note-line);
+    text-wrap: pretty;
+  }
+  :where(.tufte-figure:not([data-size="margin"], [data-size="full"])) {
+    max-inline-size: var(--tufte-col-text);
+  }
+  :where(.tufte-embed) {
+    margin-block: calc(var(--tufte-baseline) * 0.7);
+    aspect-ratio: var(--tufte-embed-ratio);
+  }
+  :where(.tufte-embed > :is(iframe, video, object, embed)) {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    border: 0;
+  }
+
+  /* Text plus margin. In narrow mode the two are the same width. */
+  :where(.tufte-full, .tufte-figure[data-size="full"]) {
+    inline-size: var(--tufte-col-full);
+    clear: both;
+  }
+  /* Body text keeps the measure. So does anything holding a margin item, whatever its
+     tag, because the item finds the margin column from its parent's end edge. */
+  :where(.tufte-full) :where(p, ul, ol, dl, blockquote, pre, h1, h2, h3),
+  :where(.tufte-full :has(.tufte-note, .tufte-margin-block, .tufte-figure[data-size="margin"]):not(.tufte-figure, .tufte-figure *, .tufte-table, .tufte-table *, pre, pre *)) {
+    max-inline-size: var(--tufte-col-text);
+  }
+  /* Inside an indent there is no room to span: it stays in the column. */
+  :where(.tufte :is(blockquote, li, dd) :is(.tufte-full, .tufte-figure[data-size="full"])) {
+    inline-size: 100%;
+  }
+
+  /* ---- Notes: a float in the margin column, at every width ------------------ */
+  :where(.tufte-note-ref) {
+    cursor: pointer;
+    /* A 24px touch target. Block padding on an inline box doesn't move the line, and
+       the negative margins take back the inline padding, so neither does this. */
+    padding: 0.45em 0.55em;
+    margin-inline: -0.5em -0.55em;
+    color: inherit;
+    text-decoration: none;
+    font-style: normal;
+    font-variant: normal;
+    counter-increment: tufte-sidenote;
+  }
+  :where(.tufte-note-ref)::after {
+    content: counter(tufte-sidenote);
+    /* super, not an offset in its own em, so it clears the x-height in a heading too. */
+    vertical-align: super;
+    font-family: var(--tufte-font-numeral);
+    /* Old-style numerals are small. On a phone they need more than the wide size. */
+    font-size: calc(var(--tufte-text-size) * 0.8);
+    line-height: 0;
+  }
+  :where(.tufte-sidenote)::before {
+    content: counter(tufte-sidenote) " ";
+    position: relative;
+    inset-block-start: -0.4em;
+    font-family: var(--tufte-font-numeral);
+    font-size: 0.9em;
+    line-height: 0;
+  }
+  :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block) {
+    /* A note inherits from wherever it was written: small caps, a heading, <code>. */
+    font-family: var(--tufte-font);
+    font-size: var(--tufte-note-size);
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: var(--tufte-note-line);
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: normal;
+    text-align: start;
+    text-wrap: pretty;
+  }
+  :where(.tufte-margin-block > :first-child, .tufte-margin-block > .tufte-note-edge + *) {
+    margin-block-start: 0;
+  }
+  :where(.tufte-margin-block > :last-child) {
+    margin-block-end: 0;
+  }
+  :where(.tufte-margin-block :is(p, ul, ol, dl, blockquote)) {
+    margin-block: 0.7em;
+  }
+  :where(.tufte-margin-block .tufte-figure) {
+    margin-block-end: 0.7em;
+  }
+  :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block) :where(code) {
+    font-size: 0.88em;
+  }
+
+  /* The whole note system. The negative margin gives the float a negative margin-box
+     width, so it never takes room from the text, and clear stacks it under the last. */
+  :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block, .tufte-figure[data-size="margin"]) {
+    display: block;
+    float: inline-end;
+    clear: inline-end;
+    inline-size: var(--tufte-col-margin);
+    max-inline-size: none;
+    margin-block: 0 0.75em;
+    margin-inline: 0 calc(-1 * (var(--tufte-col-margin) + var(--tufte-col-gap)));
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  :where(.tufte-sidenote, .tufte-marginnote) {
+    margin-block-start: var(--tufte-note-nudge);
+  }
+  /* A direct child of the article has the whole container to float in, not the column.
+     Inside Full its parent already ends at the margin column's outer edge. */
+  :where(.tufte > :is(.tufte-margin-block, .tufte-figure[data-size="margin"])) {
+    margin-inline-end: calc(100cqi - var(--tufte-col-start) - var(--tufte-col-full));
+  }
+  :where(.tufte-full > :is(.tufte-margin-block, .tufte-figure[data-size="margin"])) {
+    margin-inline-end: 0;
+  }
+
+  /* Set here because a container query can't style its own container. */
+  :where(.tufte[data-marker="bleed"]) {
+    --tufte-note-hang: calc(var(--tufte-u) * 0.3125);
+  }
+
+  /* The marker in the sliver. Only narrow screens show one. */
+  :where(.tufte-note-edge) {
+    display: none;
+  }
+
+  /* ---- Narrow screens: the margin runs off the edge, with a sliver showing ---- */
+  @media screen {
+    @container tufte (inline-size < 48em) {
+      :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block, .tufte-figure[data-size="margin"]) {
+        position: relative;
+        /* Room for the marker's word, however short the note. */
+        min-block-size: 3.4em;
+        padding-inline-start: var(--tufte-note-hang);
+        /* A link to a note lands it mid-screen rather than under the top of the page. */
+        scroll-margin-block: 35vh;
+      }
+      /* Physical sides: logical ones would follow the word's own vertical writing mode. */
+      :where(.tufte-note-edge) {
+        position: absolute;
+        inset: 0 auto 0 0;
+        display: block;
+        width: calc(var(--tufte-u) * 1.375);
+        cursor: pointer;
+        color: var(--tufte-ink);
+        font-family: var(--tufte-font);
+        font-size: var(--tufte-note-size);
+        font-style: italic;
+        line-height: 1.3;
+        text-decoration: none;
+        text-align: start;
+        white-space: nowrap;
+        writing-mode: vertical-rl;
+      }
+      :where(.tufte-note-edge:dir(rtl)) {
+        inset: 0 0 0 auto;
+      }
+      /* The marker already says the number. */
+      :where(.tufte:not([data-marker="bleed"]) .tufte-sidenote)::before {
+        content: none;
+      }
+      /* The figure is what spans the two columns. Its words keep to the text. */
+      :where(.tufte-figure[data-size="full"] > figcaption) {
+        max-inline-size: var(--tufte-col-text);
+      }
+      /* A table keeps to the text and scrolls inside itself, Full or not, so that a drag on
+         it always moves the table. A picture has no such scroller, so it can span. */
+      :where(.tufte-full .tufte-table) {
+        max-inline-size: var(--tufte-col-text);
+      }
+      /* Mandatory snap undoes a focus scroll that stops short of half way, stranding what
+         was focused off screen. These ask for more than the scroller has, so it goes all
+         the way: focus in the text rests on the text, focus in a note on the margin. Sideways
+         only. The word itself is in view at either place, so it moves nothing. */
+      :where(.tufte a, .tufte button, .tufte [tabindex]) {
+        scroll-margin-inline: 100cqi 0;
+      }
+      :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block, .tufte-figure[data-size="margin"]) :where(a, button, [tabindex]) {
+        scroll-margin-inline: 0 100cqi;
+      }
+      :where(.tufte-note-edge) {
+        scroll-margin-inline: 0;
+      }
+      /* Rule: a hairline as tall as the note, and its number if it has one. */
+      :where(.tufte[data-marker="rule"]) :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block, .tufte-figure[data-size="margin"]) {
+        min-block-size: 0;
+        border-inline-start: 1px solid var(--tufte-muted);
+      }
+      :where(.tufte[data-marker="rule"]) :where(.tufte-note-edge) {
+        width: var(--tufte-sliver);
+        padding-inline-start: 0.35em;
+        font-size: 0;
+        writing-mode: horizontal-tb;
+      }
+      :where(.tufte[data-marker="rule"] .tufte-sidenote > .tufte-note-edge)::before {
+        content: counter(tufte-sidenote);
+        font-family: var(--tufte-font-numeral);
+        font-size: var(--tufte-note-size);
+        font-style: normal;
+      }
+      /* Bleed: no mark at all. The note's first letters run off the edge of the screen.
+         The link stays, invisible, so the sliver can still be tapped. */
+      :where(.tufte[data-marker="bleed"]) :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block, .tufte-figure[data-size="margin"]) {
+        min-block-size: 0;
+      }
+      :where(.tufte[data-marker="bleed"]) :where(.tufte-note-edge) {
+        width: var(--tufte-sliver);
+        color: transparent;
+      }
+    }
+  }
+
+  /* ---- Wide mode: text column plus margin column ------------------------- */
+  @container tufte (inline-size >= 48em) {
+    :where(.tufte)::before {
+      block-size: calc(var(--tufte-u) * 4.5);
+    }
+    :where(.tufte h1) {
+      margin-block-start: calc(var(--tufte-baseline) * 2);
+    }
+    :where(.tufte-note-ref)::after {
+      font-size: calc(var(--tufte-text-size) / 1.4);
+    }
+    :where(.tufte)::after {
+      display: none;
+    }
+    :where(.tufte > *) {
+      --tufte-col-text: min(
+        var(--tufte-text-size) * var(--tufte-measure),
+        max(var(--tufte-col-room) * var(--tufte-text-share), var(--tufte-text-size) * var(--tufte-measure-min))
+      );
+      --tufte-col-gap: clamp(
+        var(--tufte-text-size) * 1.2,
+        8cqi - var(--tufte-text-size) * 1.7,
+        var(--tufte-col-text) * var(--tufte-gap-ratio)
+      );
+      --tufte-col-margin: min(
+        var(--tufte-col-room) - var(--tufte-col-text) - var(--tufte-col-gap),
+        var(--tufte-col-text) * var(--tufte-margin-ratio)
+      );
+      --tufte-col-full: calc(var(--tufte-col-text) + var(--tufte-col-gap) + var(--tufte-col-margin));
+      --tufte-col-start: max(var(--tufte-pad), (100cqi - var(--tufte-col-full)) / 2);
+    }
+
+    /* The note is right there beside its number, so a tab stop would do nothing and a
+       click nothing useful. Hidden takes the link out of the tab order, and the number,
+       on a pseudo-element, turns itself back on. */
+    :where(.tufte-note-ref) {
+      visibility: hidden;
+      pointer-events: none;
+    }
+    :where(.tufte-note-ref)::after {
+      visibility: visible;
+    }
+
+    /* Main figure: the caption is one more float in the note stack, so it can't land on
+       a note, and a note left hanging above moves the caption rather than the image. The
+       media floats too, because a float can't sit above an earlier one: that is what
+       lifts a caption which comes after the image up to the image's top edge. */
+    :where(.tufte-figure:not([data-size="margin"], [data-size="full"]) > :not(figcaption)) {
+      float: inline-start;
+      clear: inline-start;
+    }
+    :where(.tufte-figure:not([data-size="margin"], [data-size="full"]))::after {
+      content: "";
+      display: block;
+      clear: inline-start;
+    }
+    :where(.tufte-figure:not([data-size="margin"], [data-size="full"]) > figcaption) {
+      float: inline-end;
+      clear: inline-end;
+      inline-size: var(--tufte-col-margin);
+      margin-block: 0 0.75em;
+      margin-inline: 0 calc(-1 * (var(--tufte-col-margin) + var(--tufte-col-gap)));
+    }
+  }
+
+  /* ---- Places with no margin column of their own: everything stays in place ---- */
+
+  /* A float can't leave a floated box or a scroller, so a note in one sits inline. In a
+     narrow main figure the caption could let it out, but one rule for captions is simpler
+     and the note is already beside the words it belongs to. */
+  :where(.tufte-margin-block, .tufte-figure figcaption) :where(.tufte-sidenote, .tufte-marginnote) {
+    display: inline;
+    position: static;
+    float: none;
+    clear: none;
+    inline-size: auto;
+    min-block-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  /* The reference is right there, so the note doesn't repeat its number. */
+  :where(.tufte-margin-block, .tufte-figure figcaption) :where(.tufte-sidenote)::before {
+    content: " ";
+  }
+  :where(.tufte-table, .tufte pre) :where(.tufte-sidenote, .tufte-marginnote) {
+    position: static;
+    float: none;
+    clear: none;
+    inline-size: auto;
+    min-block-size: 0;
+    margin: 0.4em 0 0;
+    padding: 0;
+    border: 0;
+  }
+  :where(.tufte-table, .tufte pre) :where(.tufte-sidenote)::before {
+    content: counter(tufte-sidenote) " ";
+  }
+  :where(.tufte-margin-block, .tufte-figure figcaption, .tufte-table, .tufte pre) :where(.tufte-sidenote, .tufte-marginnote) > :where(.tufte-note-edge) {
+    display: none;
+  }
+  :where(.tufte-margin-block) :where(.tufte-figure, .tufte-figure > *, .tufte-full) {
+    float: none;
+    clear: none;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    margin-inline: 0;
+  }
+  :where(.tufte-margin-block .tufte-figure)::after {
+    content: none;
+  }
+
+  /* A drawer is its own page: notes are always open and don't count towards the article,
+     whose numbers shouldn't change because a panel was opened. */
+  :where(.tufte-drawer-body) :where(.tufte-note-ref) {
+    display: none;
+    counter-increment: none;
+  }
+  :where(.tufte-drawer-body) :where(.tufte-note-edge) {
+    display: none;
+  }
+  :where(.tufte-drawer-body) :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block),
+  :where(.tufte-drawer-body) :where(.tufte-figure, .tufte-figure > *, .tufte-full) {
+    position: static;
+    float: none;
+    clear: none;
+    inline-size: auto;
+    min-block-size: 0;
+    max-inline-size: 100%;
+    margin-inline: 0;
+    padding-inline-start: 0;
+  }
+  :where(.tufte-drawer-body) :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block) {
+    display: block;
+    margin-block: 0.6em;
+    padding-inline-start: 0.9em;
+    border-inline-start: 1px solid var(--tufte-rule);
+  }
+  :where(.tufte-drawer-body .tufte-sidenote)::before {
+    content: none;
+  }
+  :where(.tufte-drawer-body .tufte-figure > figcaption) {
+    margin-block-start: 0.5em;
+  }
+  :where(.tufte-drawer-body .tufte-figure)::after {
+    content: none;
+  }
+
+  /* ---- Focus ------------------------------------------------------------- */
+  :where(.tufte :focus-visible) {
+    outline: 2px solid var(--tufte-focus);
+    outline-offset: 2px;
+  }
+  /* Firefox puts the scroller itself in the tab order once it scrolls. */
+  :where(.tufte):focus-visible {
+    outline: 2px solid var(--tufte-focus);
+    outline-offset: -2px;
+  }
+  /* At the screen's edge, so the ring goes inside. */
+  :where(.tufte-note-edge):focus-visible {
+    outline-offset: -2px;
+  }
+
+  /* ---- Print ------------------------------------------------------------- */
+  @media print {
+    /* A smaller base also brings the 48em breakpoint into reach of a sheet of paper,
+       so print gets the real margin layout rather than a copy of its rules. */
+    :where(.tufte) {
+      font-size: 10pt;
+      padding-block: 0;
+      --tufte-margin-ratio: 0.62;
+      --tufte-text-min: 11pt;
+      --tufte-text-max: 11pt;
+      --tufte-note-min: 8.5pt;
+      --tufte-color-scheme: light;
+      --tufte-paper: transparent;
+      --tufte-ink: #000;
+      overflow: visible;
+      scroll-snap-type: none;
+    }
+    :where(.tufte > *) {
+      --tufte-pad: 0px;
+    }
+    :where(.tufte)::before {
+      block-size: 0;
+    }
+    :where(.tufte)::after {
+      display: none;
+    }
+    /* Narrow container on paper: nothing can slide, so every note sits where it was
+       written, ruled off from the text, in a single column. */
+    @container tufte (inline-size < 48em) {
+      :where(.tufte > *) {
+        --tufte-col-gap: 0px;
+        --tufte-col-text: min(var(--tufte-col-room), var(--tufte-text-size) * var(--tufte-measure));
+        --tufte-col-margin: 0px;
+        --tufte-col-full: var(--tufte-col-text);
+        --tufte-col-start: max(var(--tufte-pad), (100cqi - var(--tufte-col-full)) / 2);
+      }
+      :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block, .tufte-figure[data-size="margin"]) {
+        float: none;
+        clear: none;
+        inline-size: auto;
+        margin-block: 0.6em;
+        margin-inline: 0;
+      }
+      :where(.tufte-sidenote, .tufte-marginnote, .tufte-margin-block) {
+        padding-inline-start: 0.9em;
+        border-inline-start: 1px solid var(--tufte-rule);
+      }
+      :where(.tufte-figure[data-size="margin"]) {
+        max-inline-size: min(100%, 20em);
+      }
+      :where(.tufte > :is(.tufte-margin-block, .tufte-figure[data-size="margin"])) {
+        margin-inline: var(--tufte-col-start) 0;
+      }
+      :where(.tufte-margin-block, .tufte-figure figcaption) :where(.tufte-sidenote, .tufte-marginnote) {
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+    }
+    :where(.tufte-figure, .tufte-table, .tufte-embed, .tufte pre, .tufte-margin-block) {
+      break-inside: avoid;
+    }
+    :where(.tufte :is(h1, h2, h3)) {
+      break-after: avoid;
+    }
+    :where(.tufte p) {
+      orphans: 2;
+      widows: 2;
+    }
+    :where(.tufte-table, .tufte pre) {
+      overflow: visible;
+    }
+    /* Paper can't scroll. A table takes text and margin, and a cell may break its words
+       if that's what it takes for every column to stay on the sheet. */
+    :where(.tufte-table) {
+      inline-size: var(--tufte-col-full);
+      clear: both;
+    }
+    :where(.tufte-table table) {
+      max-inline-size: 100%;
+      margin-inline: 0;
+    }
+    :where(.tufte-table :is(th, td)) {
+      overflow-wrap: anywhere;
+    }
+    :where(.tufte pre) {
+      white-space: pre-wrap;
+    }
+    :where(.tufte pre > code) {
+      inline-size: auto;
+    }
+  }
+
+  /* ---- Helpers ----------------------------------------------------------- */
+  :where(.tufte-sr) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

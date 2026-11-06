@@ -1,39 +1,29 @@
 {
-  "name": "tufte-css",
-  "version": "1.9.0",
-  "description": "Tufte CSS provides tools to style web articles using the ideas demonstrated by Edward Tufte’s books and handouts. Edward Tufte uses a distinctive style in his handouts: simple, with well-set typography, extensive sidenotes, and tight integration of graphics and charts.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/edwardtufte/tufte-css.git"
-  },
-  "keywords": [
-    "tufte",
-    "css",
-    "HTML",
-    "typography",
-    "sidenotes"
-  ],
-  "author": "Dave Liepmann",
+  "name": "tufte-kit",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A rebuild of Tufte CSS: container queries, a cascade layer, margin notes that stay in the margin on phones, drawers, and React/MDX components.",
+  "type": "module",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/edwardtufte/tufte-css/issues"
+  "engines": {
+    "node": ">=24"
   },
-  "homepage": "https://edwardtufte.github.io/tufte-css/",
   "scripts": {
-    "build": "cleancss -o tufte.min.css tufte.css",
-    "prepublish": "npm run build",
+    "dev": "vite --port 5180 --strictPort",
+    "build": "node scripts/build.mjs",
+    "preview": "vite preview --outDir dist --port 5181 --strictPort",
     "test": "playwright test"
   },
-  "files": [
-    "tufte.css",
-    "tufte.min.css",
-    "et-book/"
-  ],
-  "engines": {
-    "node": ">=18"
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
-    "clean-css-cli": "^5.6.3"
+    "@mdx-js/rollup": "^3.1.1",
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/vite": "^4.3.4",
+    "@vitejs/plugin-react": "^6.2.1",
+    "tailwindcss": "^4.3.4",
+    "vite": "^8.3.6"
   }
 }

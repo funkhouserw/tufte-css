@@ -1,0 +1,359 @@
+/* Tufte kit: pull-out drawers. No JS: native Popover API, anchor positioning,
+   @starting-style. Markup contract in blog/DESIGN.md.
+
+   Base styles are a panel across the screen, which needs only popover support. With
+   anchor positioning it opens down from its tab's line, flipping up near the bottom of
+   the screen. The wide layout is an enhancement on top. Without popovers the content is
+   shown in flow.
+
+   Everything is specificity 0, so later rules win by source order. tufte.css imports
+   this file first, so a core rule of equal specificity overrides these. */
+
+@layer tufte {
+  :where(.tufte-drawer-tab, .tufte-drawer) {
+    --tufte-drawer-ink: var(--tufte-ink, light-dark(#111, #ddd));
+    --tufte-drawer-paper: var(--tufte-paper, light-dark(#fffff8, #151515));
+    /* A shade off the page, so the panel reads as a separate piece of paper. */
+    --tufte-drawer-sheet: color-mix(in srgb, var(--tufte-drawer-paper) 95%, var(--tufte-drawer-ink));
+    --tufte-drawer-muted: var(--tufte-muted, color-mix(in srgb, var(--tufte-drawer-ink) 74%, var(--tufte-drawer-paper)));
+    --tufte-drawer-rule: var(--tufte-rule, color-mix(in srgb, var(--tufte-drawer-ink) 28%, var(--tufte-drawer-paper)));
+    --tufte-drawer-u: var(--tufte-u, 1rem);
+    /* From the end of a paragraph to the margin column's outer edge. That edge, not the
+       container's: on a large screen the container's edge is far from the text. */
+    --tufte-drawer-reach: calc(var(--tufte-col-gap, 0px) + var(--tufte-col-margin, 45cqi));
+    --tufte-drawer-gap: calc(var(--tufte-drawer-u) * 0.75);
+    --tufte-drawer-width: calc(var(--tufte-drawer-u) * 30);
+    --tufte-drawer-time: 240ms;
+    --tufte-drawer-ease: cubic-bezier(0.22, 0.7, 0.24, 1);
+    color-scheme: var(--tufte-color-scheme, light dark);
+  }
+
+  /* Pictures want the room. */
+  :where(.tufte-drawer:has(img, svg, video)) {
+    --tufte-drawer-width: calc(var(--tufte-drawer-u) * 46);
+  }
+  /* A paragraph already spanning the margin has no margin to reach into. */
+  :where(.tufte-full .tufte-drawer-tab) {
+    --tufte-drawer-reach: 0px;
+  }
+
+  /* Tab. In narrow mode it stays inline with its words. */
+  :where(.tufte-drawer-tab) {
+    appearance: none;
+    position: relative;
+    display: inline-block;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0.14em 0.5em 0.1em;
+    font-family: var(--tufte-font, inherit);
+    /* Not em: a tab in a heading is the same size as any other. */
+    font-size: calc(var(--tufte-text-size, 1.3rem) * 0.82);
+    font-style: italic;
+    font-variant: normal;
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    max-width: 100%;
+    color: var(--tufte-drawer-muted);
+    background: var(--tufte-drawer-sheet);
+    border: 1px solid var(--tufte-drawer-rule);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: color 120ms linear, border-color 120ms linear;
+  }
+  /* Comfortable touch target without disturbing the line box. */
+  :where(.tufte-drawer-tab)::after {
+    content: "";
+    position: absolute;
+    inset: -0.45em -0.2em;
+  }
+  :where(.tufte-drawer-tab):hover {
+    color: var(--tufte-drawer-ink);
+    border-color: var(--tufte-drawer-muted);
+  }
+  /* Open: joined to its panel. Block form is a sibling of the tab's paragraph. */
+  :where(.tufte-drawer-tab:has(+ .tufte-drawer:popover-open)),
+  :where(p:has(+ .tufte-drawer:popover-open) .tufte-drawer-tab) {
+    color: var(--tufte-drawer-ink);
+    border-color: var(--tufte-drawer-rule);
+  }
+  :where(.tufte-drawer-tab, .tufte-drawer-close):focus-visible {
+    outline: 2px solid var(--tufte-focus, currentColor);
+    outline-offset: 2px;
+  }
+
+  /* Panel: across the screen, part way down it, unless enhanced below. */
+  :where(.tufte-drawer) {
+    --tufte-drawer-hidden-translate: 0 0;
+    --tufte-drawer-hidden-clip: inset(0 0 100% 0);
+
+    position: fixed;
+    inset: 15dvh max(0.5rem, env(safe-area-inset-right, 0px)) auto max(0.5rem, env(safe-area-inset-left, 0px));
+    box-sizing: border-box;
+    width: auto;
+    max-width: none;
+    height: fit-content;
+    max-height: 46dvh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+
+    /* A popover inherits from wherever it sits in the text: a heading, an <em>. */
+    font-family: var(--tufte-font, inherit);
+    font-style: normal;
+    font-variant: normal;
+    font-weight: 400;
+    letter-spacing: normal;
+    text-transform: none;
+    text-align: start;
+    text-indent: 0;
+    white-space: normal;
+    color: var(--tufte-drawer-ink);
+    background: var(--tufte-drawer-sheet);
+    border: 1px solid var(--tufte-drawer-rule);
+    box-shadow: 0 0.15em 1.1em rgb(0 0 0 / 0.14);
+
+    translate: var(--tufte-drawer-hidden-translate);
+    clip-path: var(--tufte-drawer-hidden-clip);
+    transition:
+      translate var(--tufte-drawer-time) var(--tufte-drawer-ease),
+      clip-path var(--tufte-drawer-time) var(--tufte-drawer-ease),
+      display var(--tufte-drawer-time) allow-discrete,
+      overlay var(--tufte-drawer-time) allow-discrete;
+  }
+  /* display only when open: an author `display` would beat the UA's closed-popover rule. */
+  :where(.tufte-drawer:popover-open) {
+    display: flex;
+    flex-direction: column;
+    translate: 0 0;
+    clip-path: inset(-3em);
+  }
+  @starting-style {
+    :where(.tufte-drawer:popover-open) {
+      translate: var(--tufte-drawer-hidden-translate);
+      clip-path: var(--tufte-drawer-hidden-clip);
+    }
+  }
+
+  /* It sits over the text beside its own line, so the page isn't dimmed. */
+  :where(.tufte-drawer)::backdrop {
+    background: transparent;
+  }
+
+  :where(.tufte-drawer-body) {
+    display: block;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: calc(var(--tufte-drawer-u) * 1) calc(var(--tufte-drawer-u) * 1.25) calc(var(--tufte-drawer-u) * 0.5);
+    font-size: var(--tufte-note-size, 1rem);
+    line-height: 1.45;
+  }
+  /* Pseudo-classes outside :where() on purpose: core's p margin comes later in the layer. */
+  :where(.tufte-drawer-body) > :first-child {
+    margin-block-start: 0;
+  }
+  :where(.tufte-drawer-body) > :last-child {
+    margin-block-end: 0;
+  }
+  :where(.tufte-drawer-body) :where(p, ul, ol, blockquote, figure, figcaption) {
+    width: auto;
+    max-width: none;
+    font-size: inherit;
+    line-height: inherit;
+  }
+  :where(.tufte-drawer-body) :where(img, svg, video) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  :where(.tufte-drawer-close) {
+    appearance: none;
+    flex: none;
+    align-self: flex-end;
+    margin: 0 calc(var(--tufte-drawer-u) * 0.6) calc(var(--tufte-drawer-u) * 0.4);
+    padding: 0.35em 0.6em;
+    font-family: var(--tufte-font, inherit);
+    font-size: calc(var(--tufte-note-size, 1rem) * 0.9);
+    font-style: italic;
+    line-height: 1.2;
+    color: var(--tufte-drawer-muted);
+    background: none;
+    border: 0;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  :where(.tufte-drawer-close):hover {
+    color: var(--tufte-drawer-ink);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  /* Wide tab: a float in the margin, flush with the page's outer edge. Floats give the
+     stacking rule: clear keeps tabs from overlapping each other or a sidenote, and a
+     crowded tab drops below its line rather than ever sitting above it. */
+  @container tufte (inline-size >= 48em) {
+    :where(.tufte-drawer-tab) {
+      float: right;
+      clear: right;
+      max-width: var(--tufte-col-margin, 30cqi);
+      /* Tab plus margins stays under a line of text, so tabs on adjacent lines both keep
+         their own line. Taller, and each one would push the next down a line. */
+      margin: 0.1em calc(-1 * var(--tufte-drawer-reach)) 1px 0;
+      padding: 0.1em 0.6em 0.08em 0.7em;
+      text-align: start;
+      border-radius: 3px 0 0 3px;
+    }
+    :where(.tufte-drawer-tab)::after {
+      inset: 0;
+    }
+  }
+
+  @supports (top: anchor(top)) and (position-try-fallbacks: --x) {
+    /* Narrow panel: opens down from under the tab's line. Near the bottom of the screen it
+       flips up, and if there is no room either way it pins to the top. The clamps keep it
+       on screen when the tab scrolls away, as the wide panel's do. */
+    @position-try --tufte-drawer-fit {
+      top: var(--tufte-drawer-gap);
+      bottom: auto;
+    }
+    :where(.tufte-drawer) {
+      top: max(var(--tufte-drawer-gap), anchor(bottom) + 3px);
+      position-try-fallbacks: flip-block, --tufte-drawer-fit;
+      position-visibility: always;
+    }
+
+    /* Wide panel: slides out from under the tab, so the tab stays visible, keeps its
+       focus ring and closes the drawer on a second click. */
+    @position-try --tufte-drawer-up {
+      top: auto;
+      bottom: max(var(--tufte-drawer-gap), anchor(bottom));
+      left: max(var(--tufte-drawer-gap), anchor(left) - var(--tufte-drawer-width));
+      right: anchor(left);
+    }
+    /* Taller than the room either way, or the tab has scrolled away. */
+    @position-try --tufte-drawer-pin {
+      top: var(--tufte-drawer-gap);
+      bottom: auto;
+      left: max(var(--tufte-drawer-gap), anchor(left) - var(--tufte-drawer-width));
+      right: anchor(left);
+    }
+
+    @container tufte (inline-size >= 48em) {
+      :where(.tufte-drawer) {
+        --tufte-drawer-hidden-translate: 100% 0;
+        --tufte-drawer-hidden-clip: inset(-3em 100% -3em -3em);
+
+        /* Both directions are clamped, because a negative inset doesn't count as overflow
+           and so never triggers a fallback by itself. Tab below the viewport: this
+           overflows, --up runs and its clamp holds the panel at the bottom. Tab above it:
+           this clamp holds it at the top. Pure CSS can't do better than that: engines move
+           an anchored box by the scroll delta without always laying it out again, so in
+           Chromium a panel can drift off after several scrolls in opposite directions. */
+        top: max(0px, anchor(top));
+        bottom: auto;
+        left: max(var(--tufte-drawer-gap), anchor(left) - var(--tufte-drawer-width));
+        right: anchor(left);
+        width: auto;
+        max-width: none;
+        max-height: calc(100dvh - 2 * var(--tufte-drawer-gap));
+        padding: 0;
+        border-width: 1px;
+        border-radius: 3px 0 3px 3px;
+        position-try-fallbacks: --tufte-drawer-up, --tufte-drawer-pin;
+        position-visibility: always;
+      }
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :where(.tufte-drawer-tab, .tufte-drawer) {
+      transition: none;
+    }
+  }
+
+  /* No popover support: the buttons would do nothing, so show the content in flow. */
+  @supports not selector(:popover-open) {
+    :where(.tufte-drawer-tab, .tufte-drawer-close) {
+      display: none;
+    }
+    :where(.tufte-drawer) {
+      position: static;
+      display: block;
+      width: auto;
+      max-width: none;
+      max-height: none;
+      margin: 0.75em 0;
+      padding: 0 0 0 0.9em;
+      overflow: visible;
+      background: none;
+      border: 0 solid var(--tufte-drawer-rule);
+      border-inline-start-width: 1px;
+      box-shadow: none;
+      translate: none;
+      clip-path: none;
+      transition: none;
+    }
+    :where(.tufte-drawer-body) {
+      padding: 0;
+      overflow: visible;
+    }
+  }
+
+  /* Print: every drawer's content, floated so an inline one doesn't split its sentence. */
+  @media print {
+    :where(.tufte-drawer-tab, .tufte-drawer-close) {
+      display: none;
+    }
+    :where(.tufte-drawer, .tufte-drawer:popover-open) {
+      position: static;
+      display: block;
+      float: right;
+      clear: right;
+      width: 42%;
+      max-width: none;
+      height: auto;
+      max-height: none;
+      margin: 0.2em 0 0.6em 1.2em;
+      padding: 0;
+      overflow: visible;
+      font-size: 0.85em;
+      color: inherit;
+      background: none;
+      border: 0;
+      box-shadow: none;
+      translate: none;
+      clip-path: none;
+      transition: none;
+    }
+    :where(.tufte-drawer)::backdrop {
+      display: none;
+    }
+    /* Same room as a sidenote when the paper has a margin. */
+    @container tufte (inline-size >= 48em) {
+      :where(.tufte-drawer, .tufte-drawer:popover-open) {
+        width: var(--tufte-col-margin);
+        margin: 0 calc(-1 * var(--tufte-drawer-reach)) 0.75em 0;
+        font-size: inherit;
+      }
+    }
+    /* Block drawers can run long, so they stay in the text column. */
+    :where(aside.tufte-drawer) {
+      float: none;
+      clear: none;
+      width: auto;
+      margin: 0.6em 0;
+    }
+    :where(.tufte-drawer-body) {
+      padding: 0;
+      overflow: visible;
+    }
+    :where(.tufte-drawer)::before {
+      content: attr(aria-label);
+      display: block;
+      font-style: italic;
+    }
+  }
+}

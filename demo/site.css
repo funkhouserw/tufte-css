@@ -1,0 +1,19 @@
+@import "../src/tufte/tufte-tailwind.css";
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities" layer(utilities) source(none);
+@import "../src/tufte/tufte.css";
+
+/* Tailwind is optional in a page: only the classes it uses reach the stylesheet. No
+   Preflight, since it would reset the host page. */
+@source "./*.mdx";
+
+/* The page around the article. The kit styles nothing outside .tufte, so the host page
+   sets the margin and carries the paper color past the end of a short article. */
+html {
+  color-scheme: light dark;
+  background: light-dark(#fffff8, #151515);
+}
+
+body {
+  margin: 0;
+}

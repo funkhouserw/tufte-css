@@ -1,0 +1,35 @@
+/* Tufte kit: optional Tailwind v4 adapter. Tokens and variants only; prose styling stays
+   in tufte.css. Import this BEFORE tailwindcss, so the layer order below is the first one
+   declared. Otherwise Preflight's resets beat the kit:
+
+     @import "./tufte/tufte-tailwind.css";
+     @import "tailwindcss";
+     @import "./tufte/tufte.css";
+
+   The --tufte-* values exist only inside .tufte, so these utilities work only in there. */
+
+@layer theme, base, tufte, components, utilities;
+
+@theme inline {
+  --color-tufte-paper: var(--tufte-paper);
+  --color-tufte-ink: var(--tufte-ink);
+  --color-tufte-rule: var(--tufte-rule);
+  --color-tufte-muted: var(--tufte-muted);
+
+  --font-tufte: var(--tufte-font);
+  --font-tufte-numeral: var(--tufte-font-numeral);
+  --font-tufte-sans: var(--tufte-font-sans);
+  --font-tufte-mono: var(--tufte-font-mono);
+
+  --text-tufte: var(--tufte-text-size);
+  --text-tufte-note: var(--tufte-note-size);
+
+  --spacing-tufte-baseline: var(--tufte-baseline);
+  --spacing-tufte-text: var(--tufte-col-text);
+  --spacing-tufte-margin: var(--tufte-col-margin);
+  --spacing-tufte-full: var(--tufte-col-full);
+}
+
+/* Must match the breakpoint in tufte.css: a container condition can't read a variable. */
+@custom-variant tufte-wide (@container tufte (inline-size >= 48em));
+@custom-variant tufte-narrow (@container tufte (inline-size < 48em));
